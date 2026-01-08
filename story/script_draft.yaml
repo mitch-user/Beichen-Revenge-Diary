@@ -1,0 +1,119 @@
+第一章
+- id: CH1_001
+  chapter: CH1
+  type: dialogue
+  bg: car_accident_bg
+  ch: []
+  speaker: NARRATOR
+  text: "一道刺耳的煞車聲劃破夜色。\n金屬扭曲，玻璃碎裂。\n顧北辰的世界陷入黑暗。"
+  next: CH1_002
+
+- id: CH1_002
+  chapter: CH1
+  type: dialogue
+  bg: bedroom_bg
+  ch:
+    - name: 顧北辰
+      pos: center
+      expression: pain
+  speaker: 顧北辰
+  text: "……痾…嗯…。 \n這裡是哪裡？\n我不是……死了嗎？"
+  next: CH1_003
+
+- id: CH1_003
+  chapter: CH1
+  type: dialogue
+  bg: bedroom_bg
+  ch: []
+  speaker: NARRATOR
+  text: "看著熟悉的天花板，你的頭隱隱作痛。"
+  next: CH1_004
+
+- id: CH1_004
+  chapter: CH1
+  type: dialogue
+  bg: bedroom_bg
+  ch:
+    - name: 顧北辰
+      pos: center
+      expression: confuse
+  speaker: 顧北辰
+  text: "等等……這是我出車禍那天？\n我重生了。"
+  next: CH1_005
+
+- id: CH1_005
+  chapter: CH1
+  type: dialogue
+  bg: bedroom_bg
+  ch: []
+  speaker: NARRATOR
+  text: "突然間，大量回憶湧入。"
+  next: CH1_006
+
+- id: CH1_006
+  chapter: CH1
+  type: dialogue
+  bg: bedroom_bg
+  ch:
+    - name: 顧北辰
+      pos: center
+      expression: cold
+  speaker: 顧北辰
+  text: "上一世，顧南辰和柳如煙聯手奪走我的一切。\n只為顧氏集團的繼承權。"
+  next: CH1_007
+
+- id: CH1_007
+  chapter: CH1
+  type: dialogue
+  bg: bedroom_bg
+  ch:
+    - name: 顧北辰
+      pos: center
+      expression: regret
+  speaker: 顧北辰
+  text: "我也想起……我曾為了柳如煙，愧對林溪然。\n這一世，我要復仇，也要把她追回來。"
+  next: CH1_008
+
+- id: CH1_008
+  chapter: CH1
+  type: dialogue
+  bg: bedroom_bg
+  ch:
+    - name: 顧北辰
+      pos: center
+      expression: resolve
+  speaker: NARRATOR
+  text: "你打開手機，螢幕上跳出兩條訊息。\n\n顧南辰：「哥，快開會了你怎麼還沒來？」\n林溪然：「親愛的，今天我跟姊妹去逛街，就不跟你吃晚餐了喔。」\n\n你暗暗握緊手機。"
+  next: CH1_009
+
+- id: CH1_009
+  chapter: CH1
+  type: dialogue
+  bg: bedroom_bg
+  ch:
+    - name: 顧北辰
+      pos: center
+      expression: cold
+  speaker: 顧北辰
+  text: "竟敢暗算我……你們給我等著。\n我會先解決你們。"
+  next: CH1_010
+
+- id: CH1_010
+  chapter: CH1
+  type: dialogue
+  bg: bedroom_bg
+  ch: []
+  speaker: NARRATOR
+  text: "你傳了一封訊息給顧南辰。"
+  next: CH1_011
+
+- id: CH1_011
+  chapter: CH1
+  type: choice
+  bg: bedroom_bg
+  ch: []
+  speaker: NARRATOR
+  text: "你決定先做哪一步？"
+  choices:
+    - text: "先去會顧南辰（進入第二章）"
+      goto: CH2_001
