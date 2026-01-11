@@ -1,3 +1,4 @@
+# main.py
 import os
 import sys
 import math
@@ -23,7 +24,6 @@ STORY_PATH = os.path.join(BASE_DIR, "story", "script_draft.yaml")
 DIALOGUE_H = int(SCREEN_H * 0.28)
 DIALOGUE_RECT = pygame.Rect(50, SCREEN_H - DIALOGUE_H - 35, SCREEN_W - 100, DIALOGUE_H)
 NAME_RECT = pygame.Rect(DIALOGUE_RECT.x, DIALOGUE_RECT.y - 45, 260, 40)
-
 CHOICE_ITEM_H = 54
 
 # Colors
@@ -36,7 +36,7 @@ CHAR_HEIGHT_RATIO = 0.82
 CHAR_BOTTOM_PAD = 12
 
 # 打字機效果
-TYPE_SPEED_CHARS_PER_SEC = 40  # 每秒顯示幾個字（可調快/慢）
+TYPE_SPEED_CHARS_PER_SEC = 40  # 每秒顯示幾個字（可調）
 
 # 角色跳動效果
 BOUNCE_DURATION = 0.22  # 秒
@@ -142,27 +142,6 @@ class AssetManager:
 # 劇本（nodes 格式）
 # -------------------------
 class Script:
-    """
-    YAML 格式：
-    meta:
-      start: CH1_001
-    nodes:
-      - id: CH1_001
-        type: dialogue|choice|end
-        bg: bedroom_bg
-        speaker: NARRATOR
-        text: "..."
-        next: CH1_002
-        choices:
-          - text: "..."
-            goto: CH2_001
-        goto_minigame: 1|2|3
-        ch:
-          - name: 顧北辰
-            pos: left|center|right
-            expression: normal
-    """
-
     def __init__(self, raw: Dict[str, Any]):
         self.raw = raw
         self.meta = raw.get("meta", {})
@@ -178,7 +157,6 @@ class Script:
             self.nodes[str(n["id"])] = n
 
         self.start_id = str(self.meta.get("start") or (nodes[0].get("id") if nodes else ""))
-        self.start_scene = self.start_id  # 相容舊名稱
         if self.start_id not in self.nodes:
             raise ValueError(f"start id 不存在：{self.start_id}")
 
@@ -216,7 +194,6 @@ class VNEngine:
         self._bounce_name: Optional[str] = None
         self._bounce_t = 0.0
 
-        # choice
         self.choice_active = False
         self.choice_prompt = ""
         self.choice_options: List[Dict[str, Any]] = []
@@ -226,25 +203,28 @@ class VNEngine:
         self._missing_sprite_warn: Optional[str] = None
         self._missing_sprite_warn_t = 0.0
 
+        # ✅ 轉場設定
+        self.FADE_OUT_SEC = 0.28
+        self.FADE_IN_SEC = 0.28
+
+    def _set_missing_warn(self, msg: str):
+        self._missing_sprite_warn = msg
+        self._missing_sprite_warn_t = 2.0
+
     # -------------------------
     # 封面
     # -------------------------
     def show_cover_screen(self) -> bool:
-        """
-        使用 assets/bg/cover_main.png 的封面
-        中間底部有「點擊後進入遊戲」按鈕
-        回傳 True = 進入遊戲, False = 離開
-        """
         W, H = self.screen.get_size()
-
         cover_img = self.assets.image_fit_screen("bg/cover_main.png")
 
-        bw, bh = 360, 70
+        # ✅ 按鈕更小 + 往下移
+        bw, bh = 280, 50
         btn = pygame.Rect(0, 0, bw, bh)
-        btn.center = (W // 2, int(H * 0.78))
+        btn.center = (W // 2, int(H * 0.90))
 
-        btn_font = pygame.font.SysFont("Microsoft JhengHei", 28, bold=True)
-        tip_font = pygame.font.SysFont("Microsoft JhengHei", 20)
+        btn_font = pygame.font.SysFont("Microsoft JhengHei", 22, bold=True)
+        tip_font = pygame.font.SysFont("Microsoft JhengHei", 16)
 
         while True:
             self.clock.tick(FPS)
@@ -264,34 +244,146 @@ class VNEngine:
 
             self.screen.blit(cover_img, (0, 0))
 
-            # 讓按鈕更清楚（淡黑遮罩）
             overlay = pygame.Surface((W, H), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 40))
+            overlay.fill((0, 0, 0, 45))
             self.screen.blit(overlay, (0, 0))
 
             hover = btn.collidepoint(mx, my)
-            pygame.draw.rect(
-                self.screen,
-                (245, 245, 245) if hover else (220, 220, 228),
-                btn,
-                border_radius=18
-            )
-            pygame.draw.rect(self.screen, (255, 255, 255), btn, width=2, border_radius=18)
+            pygame.draw.rect(self.screen, (245, 245, 245) if hover else (220, 220, 228), btn, border_radius=16)
+            pygame.draw.rect(self.screen, (255, 255, 255), btn, width=2, border_radius=16)
 
             txt = btn_font.render("點擊後進入遊戲", True, (25, 25, 30))
             self.screen.blit(txt, txt.get_rect(center=btn.center))
 
-            tip = tip_font.render("Enter / Space 也可開始｜ESC 離開", True, (230, 230, 235))
-            self.screen.blit(tip, tip.get_rect(center=(W // 2, btn.bottom + 28)))
+            tip = tip_font.render("Enter / Space 也可開始｜ESC 離開", True, (235, 235, 240))
+            self.screen.blit(tip, tip.get_rect(center=(W // 2, btn.bottom + 22)))
 
             pygame.display.flip()
 
     # -------------------------
-    # 內部工具
+    # END 容錯
     # -------------------------
-    def _set_missing_warn(self, msg: str):
-        self._missing_sprite_warn = msg
-        self._missing_sprite_warn_t = 2.0  # 顯示 2 秒
+    def _set_virtual_end(self, text: str):
+        self.script.nodes["__END__"] = {"id": "__END__", "type": "end", "text": text}
+
+    def _resolve_bg_path_from_node(self, node: Dict[str, Any]) -> Optional[str]:
+        bg_key = node.get("bg")
+        if not bg_key:
+            return None
+        bg_key = str(bg_key)
+        if "/" in bg_key or bg_key.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+            return bg_key.replace("\\", "/")
+        return f"bg/{bg_key}.png"
+
+    # -------------------------
+    # 黑幕轉場（fade）
+    # -------------------------
+    def _fade_to_black(self, seconds: float) -> bool:
+        t = 0.0
+        while t < seconds:
+            dt = self.clock.tick(FPS) / 1000.0
+            t += dt
+
+            for e in pygame.event.get():
+                if e.type == pygame.QUIT:
+                    return False
+                if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
+                    return False
+
+            self.draw()
+            a = int(255 * min(1.0, t / seconds))
+            overlay = pygame.Surface((SCREEN_W, SCREEN_H))
+            overlay.fill((0, 0, 0))
+            overlay.set_alpha(a)
+            self.screen.blit(overlay, (0, 0))
+            pygame.display.flip()
+        return True
+
+    def _fade_from_black(self, seconds: float) -> bool:
+        t = 0.0
+        while t < seconds:
+            dt = self.clock.tick(FPS) / 1000.0
+            t += dt
+
+            for e in pygame.event.get():
+                if e.type == pygame.QUIT:
+                    return False
+                if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
+                    return False
+
+            self.draw()
+            a = int(255 * max(0.0, 1.0 - (t / seconds)))
+            overlay = pygame.Surface((SCREEN_W, SCREEN_H))
+            overlay.fill((0, 0, 0))
+            overlay.set_alpha(a)
+            self.screen.blit(overlay, (0, 0))
+            pygame.display.flip()
+        return True
+
+    def _go_to_node(self, node_id: str):
+        if node_id not in self.script.nodes:
+            if str(node_id).strip().upper() == "END":
+                self._set_virtual_end("THE END（按 ESC 離開）")
+                node_id = "__END__"
+            else:
+                raise KeyError(f"找不到節點：{node_id}")
+        self.goto(node_id)
+        self.next_step()
+
+    def _transition_to_node(self, node_id: str, force: bool = False) -> bool:
+        """
+        ✅ 轉場策略：
+        - force=True：無論背景是否相同，都做黑幕淡出（用於 進小遊戲 / 回主線）
+        - force=False：只有背景不同才做黑幕淡出（一般對話/選項切換）
+        """
+        target_id = node_id
+        if target_id not in self.script.nodes:
+            if str(target_id).strip().upper() == "END":
+                self._set_virtual_end("THE END（按 ESC 離開）")
+                target_id = "__END__"
+            else:
+                raise KeyError(f"找不到節點：{target_id}")
+
+        cur_node = self.script.nodes[self.node_id]
+        next_node = self.script.nodes[target_id]
+        cur_bg = self._resolve_bg_path_from_node(cur_node)
+        next_bg = self._resolve_bg_path_from_node(next_node)
+
+        do_fade = force or (cur_bg != next_bg)
+        if not do_fade:
+            self._go_to_node(target_id)
+            return True
+
+        if not self._fade_to_black(self.FADE_OUT_SEC):
+            return False
+        self._go_to_node(target_id)
+        if not self._fade_from_black(self.FADE_IN_SEC):
+            return False
+        return True
+
+    # -------------------------
+    # 狀態控制
+    # -------------------------
+    def goto(self, node_id: str):
+        if node_id not in self.script.nodes:
+            raise KeyError(f"找不到節點：{node_id}")
+        self.node_id = node_id
+        self.current_name = ""
+        self.current_text = ""
+        self.waiting_input = False
+        self.choice_active = False
+        self.choice_prompt = ""
+        self.choice_options = []
+        self.choice_hover = -1
+        self.current_chars = []
+
+        self._full_text = ""
+        self._shown_len = 0
+        self._typing = False
+        self._type_acc = 0.0
+
+        self._bounce_name = None
+        self._bounce_t = 0.0
 
     def _start_typing(self, full_text: str):
         self._full_text = full_text
@@ -333,49 +425,7 @@ class VNEngine:
         self._bounce_name = None
         self._bounce_t = 0.0
 
-    def goto(self, node_id: str):
-        # ✅ 支援 next: END 這種寫法（避免 KeyError）
-        if str(node_id).upper() == "END":
-            self.node_id = "END"
-            self.current_name = ""
-            self.current_chars = []
-            self.choice_active = False
-            self.choice_prompt = ""
-            self.choice_options = []
-            self.choice_hover = -1
-            self.waiting_input = True
-
-            self._start_typing("THE END（按 ESC 離開）")
-            self._start_bounce_if_needed()
-            return
-
-        if node_id not in self.script.nodes:
-            raise KeyError(f"找不到節點：{node_id}")
-
-        self.node_id = node_id
-        self.current_name = ""
-        self.current_text = ""
-        self.waiting_input = False
-        self.choice_active = False
-        self.choice_prompt = ""
-        self.choice_options = []
-        self.choice_hover = -1
-        self.current_chars = []
-
-        self._full_text = ""
-        self._shown_len = 0
-        self._typing = False
-        self._type_acc = 0.0
-
-        self._bounce_name = None
-        self._bounce_t = 0.0
-
     def next_step(self):
-        # ✅ END 直接顯示，不讀 YAML
-        if self.node_id == "END":
-            self.waiting_input = True
-            return
-
         node = self.script.nodes[self.node_id]
         t = str(node.get("type", "dialogue"))
 
@@ -397,7 +447,13 @@ class VNEngine:
             self._start_bounce_if_needed()
             return
 
+        # ✅ 小遊戲插入：進入前做一次 forced fade
         if node.get("goto_minigame") is not None:
+            # 進小遊戲前：黑幕淡出（強制）
+            if not self._fade_to_black(self.FADE_OUT_SEC):
+                pygame.quit()
+                sys.exit(0)
+
             mg_map = {1: "mg1", 2: "mg2", 3: "mg3"}
             mg_id = mg_map.get(int(node["goto_minigame"]))
             if not mg_id:
@@ -405,10 +461,17 @@ class VNEngine:
 
             _passed = MINIGAMES[mg_id].run(self.screen, self.clock, self.font_small)
 
+            # 回主線後：淡入（讓回來也有感）
+            # 先切回 next 節點（強制轉場：就算背景相同也做）
             nxt = node.get("next")
             if nxt:
-                self.goto(str(nxt))
-                self.next_step()
+                ok = self._transition_to_node(str(nxt), force=True)
+                if not ok:
+                    pygame.quit()
+                    sys.exit(0)
+            else:
+                # 沒 next 就直接淡入回當前畫面
+                self._fade_from_black(self.FADE_IN_SEC)
             return
 
         if t == "dialogue":
@@ -423,7 +486,6 @@ class VNEngine:
             self.current_name = str(node.get("speaker", ""))
             self.choice_prompt = str(node.get("text", "請選擇："))
             self.choice_options = node.get("choices", [])
-
             if not isinstance(self.choice_options, list) or len(self.choice_options) == 0:
                 raise ValueError(f"choice 節點 {self.node_id} choices 必須是 list 且不可為空")
 
@@ -433,7 +495,7 @@ class VNEngine:
 
             self.choice_active = True
             self.waiting_input = True
-            self._start_typing("")  # choice 不顯示正文
+            self._start_typing("")
             self._start_bounce_if_needed()
             return
 
@@ -456,8 +518,10 @@ class VNEngine:
                 if not jump:
                     raise ValueError("choice option 缺少 goto/jump")
                 self.choice_active = False
-                self.goto(str(jump))
-                self.next_step()
+                ok = self._transition_to_node(str(jump), force=False)
+                if not ok:
+                    pygame.quit()
+                    sys.exit(0)
                 return
 
     def update_hover(self, pos: Tuple[int, int]):
@@ -491,13 +555,14 @@ class VNEngine:
         return int(-math.sin(phase) * BOUNCE_HEIGHT)
 
     def draw(self):
+        # background
         if self.bg_path:
             bg = self.assets.image_fit_screen(self.bg_path)
             self.screen.blit(bg, (0, 0))
         else:
             self.screen.fill((16, 18, 22))
 
-        # 角色
+        # characters
         for c in self.current_chars:
             try:
                 name = str(c.get("name", "")).strip()
@@ -518,7 +583,6 @@ class VNEngine:
                 y += self._bounce_offset(name)
 
                 self.screen.blit(sprite_s, (x, y))
-
             except FileNotFoundError as e:
                 self._set_missing_warn(str(e))
 
@@ -552,29 +616,29 @@ class VNEngine:
             panel = pygame.Surface((DIALOGUE_RECT.w, DIALOGUE_RECT.h), pygame.SRCALPHA)
             panel.fill((20, 20, 26, 190))
             self.screen.blit(panel, (DIALOGUE_RECT.x, DIALOGUE_RECT.y))
-            pygame.draw.rect(self.screen, WHITE, DIALOGUE_RECT, width=2, border_radius=18)
+            pygame.draw.rect(self.screen, (255, 255, 255), DIALOGUE_RECT, width=2, border_radius=18)
 
             if self.current_name:
                 name_panel = pygame.Surface((NAME_RECT.w, NAME_RECT.h), pygame.SRCALPHA)
                 name_panel.fill((30, 30, 36, 210))
                 self.screen.blit(name_panel, (NAME_RECT.x, NAME_RECT.y))
-                pygame.draw.rect(self.screen, WHITE, NAME_RECT, width=2, border_radius=12)
+                pygame.draw.rect(self.screen, (255, 255, 255), NAME_RECT, width=2, border_radius=12)
                 draw_text(self.screen, self.font_name, self.current_name, WHITE, NAME_RECT.inflate(-14, -10), wrap=False)
 
-            text_rect = DIALOGUE_RECT.inflate(-20, -28)
+            text_rect = DIALOGUE_RECT.inflate(-20, -20)
             draw_text(self.screen, self.font, self.current_text, WHITE, text_rect, wrap=True)
 
-            hint = "（左鍵/Enter：打字中→顯示全文；非打字→下一句｜ESC 離開）"
+            hint = "（左鍵 / Enter：若還在打字→直接顯示全文；否則→下一句｜ESC 離開）"
             draw_text(
                 self.screen,
                 self.font_small,
                 hint,
                 (200, 200, 200),
-                pygame.Rect(DIALOGUE_RECT.x, DIALOGUE_RECT.bottom - 26, DIALOGUE_RECT.w, 24),
+                pygame.Rect(DIALOGUE_RECT.x, DIALOGUE_RECT.bottom - 28, DIALOGUE_RECT.w, 24),
                 wrap=False,
             )
 
-        # 缺圖警告
+        # missing warning
         if self._missing_sprite_warn and self._missing_sprite_warn_t > 0:
             warn_rect = pygame.Rect(16, 12, SCREEN_W - 32, 30)
             draw_text(
@@ -586,42 +650,39 @@ class VNEngine:
                 wrap=False,
             )
 
-    def _advance(self):
+    def _advance(self) -> bool:
         if self._typing:
             self._finish_typing()
-            return
-
-        if self.node_id == "END":
-            return
+            return True
 
         cur = self.script.nodes[self.node_id]
         nxt = cur.get("next")
         if nxt:
-            self.goto(str(nxt))
+            return self._transition_to_node(str(nxt), force=False)
         self.next_step()
+        return True
 
     def run(self):
         print(">>> VNEngine.run start")
 
-        # ✅ 先跑封面
         if not self.show_cover_screen():
             pygame.quit()
             return
 
-        # ✅ 進入劇情
         self.next_step()
 
         running = True
         while running:
             dt = self.clock.tick(FPS) / 1000.0
 
-            # typing & bounce & warn
             self._update_typing(dt)
+
             if self._bounce_name:
                 self._bounce_t += dt
                 if self._bounce_t > BOUNCE_DURATION:
                     self._bounce_name = None
                     self._bounce_t = 0.0
+
             if self._missing_sprite_warn_t > 0:
                 self._missing_sprite_warn_t = max(0.0, self._missing_sprite_warn_t - dt)
 
@@ -639,14 +700,15 @@ class VNEngine:
                     if self.choice_active:
                         self.handle_choice_click(e.pos)
                     else:
-                        self._advance()
+                        if not self._advance():
+                            running = False
 
                 elif e.type == pygame.KEYDOWN and e.key in (pygame.K_RETURN, pygame.K_SPACE):
                     if self.choice_active:
-                        # choice 狀態下避免誤觸推進
                         pass
                     else:
-                        self._advance()
+                        if not self._advance():
+                            running = False
 
             self.draw()
             pygame.display.flip()
