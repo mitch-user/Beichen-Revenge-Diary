@@ -49,6 +49,7 @@ BOUNCE_HEIGHT = 14      # 像素
 def clamp(v: float, a: float, b: float) -> float:
     return max(a, min(b, v))
 
+
 def draw_text(
     surface: pygame.Surface,
     font: pygame.font.Font,
@@ -69,21 +70,17 @@ def draw_text(
     max_h = rect.h
     line_h = font.get_height() + line_spacing
 
-    # 先用 \n 切段（保留手動換行）
     paragraphs = text.split("\n")
-
     for p_i, para in enumerate(paragraphs):
         if y > rect.y + max_h - font.get_height():
             break
 
-        # 逐字組行（中文也 OK）
         line = ""
         for ch in para:
             test = line + ch
             if font.size(test)[0] <= max_w:
                 line = test
             else:
-                # 先畫目前這行
                 img = font.render(line, True, color)
                 surface.blit(img, (x, y))
                 y += line_h
@@ -91,17 +88,13 @@ def draw_text(
                     return
                 line = ch
 
-        # 段落最後一行
         if line:
             img = font.render(line, True, color)
             surface.blit(img, (x, y))
             y += line_h
 
-        # 段落之間（原本的 \n）也算一個空行距
         if p_i != len(paragraphs) - 1:
-            # 讓手動換行看起來有間距
             y += int(line_spacing * 0.5)
-
 
 
 def load_yaml(path: str) -> Dict[str, Any]:
@@ -117,6 +110,7 @@ def load_yaml(path: str) -> Dict[str, Any]:
 def safe_join(base: str, rel: str) -> str:
     rel = rel.replace("\\", "/").lstrip("/")
     return os.path.join(base, rel)
+
 
 # -------------------------
 # 資源管理（圖片快取）
@@ -142,6 +136,7 @@ class AssetManager:
     def image_fit_screen(self, rel_path: str) -> pygame.Surface:
         img = self.image(rel_path)
         return pygame.transform.smoothscale(img, (SCREEN_W, SCREEN_H))
+
 
 # -------------------------
 # 劇本（nodes 格式）
@@ -189,258 +184,6 @@ class Script:
 
 
 # -------------------------
-# 小遊戲（3 個）
-# -------------------------
-class MiniGameBase:
-    name = "minigame"
-
-    def run(self, screen: pygame.Surface, clock: pygame.time.Clock, font: pygame.font.Font) -> bool:
-        raise NotImplementedError
-
-
-class MiniGame1_ClickInTime(MiniGameBase):
-    name = "mg1"
-
-    def run(self, screen, clock, font):
-        success = 0
-        t = 0.0
-        zone = pygame.Rect(SCREEN_W // 2 - 120, SCREEN_H // 2 - 14, 240, 28)
-        bar = pygame.Rect(0, 0, 18, 60)
-        bar.centery = zone.centery
-
-        while True:
-            dt = clock.tick(FPS) / 1000.0
-            t += dt
-
-            for e in pygame.event.get():
-                if e.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit(0)
-                if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
-                    return False
-                if e.type == pygame.KEYDOWN and e.key == pygame.K_SPACE:
-                    if zone.left <= bar.centerx <= zone.right:
-                        success += 1
-                    else:
-                        success = max(0, success - 1)
-                    if success >= 3:
-                        return True
-
-            x = (math.sin(t * 2.2) * 0.45 + 0.5) * (SCREEN_W - 100) + 50
-            bar.centerx = int(x)
-
-            screen.fill((22, 22, 26))
-            pygame.draw.rect(screen, (60, 60, 70), zone, border_radius=12)
-            pygame.draw.rect(screen, (120, 220, 120), zone.inflate(-120, -6), border_radius=10)
-            pygame.draw.rect(screen, (240, 240, 240), bar, border_radius=10)
-
-            draw_text(
-                screen,
-                font,
-                "小遊戲1：SPACE 在綠色區域｜成功 3 次過關｜ESC 放棄",
-                WHITE,
-                pygame.Rect(50, 60, SCREEN_W - 100, 40),
-                wrap=False,
-            )
-            draw_text(
-                screen,
-                font,
-                f"成功次數：{success}/3",
-                WHITE,
-                pygame.Rect(50, 110, SCREEN_W - 100, 40),
-                wrap=False,
-            )
-
-            pygame.display.flip()
-
-
-class MiniGame2_MemoryPairs(MiniGameBase):
-    name = "mg2"
-
-    def run(self, screen, clock, font):
-        cols, rows = 4, 3
-        total = cols * rows
-        values = list(range(total // 2)) * 2
-        random.shuffle(values)
-
-        revealed = [False] * total
-        matched = [False] * total
-        first = None
-        lock = 0.0
-        pending_hide: Optional[Tuple[int, int]] = None
-
-        pad = 16
-        card_w = 150
-        card_h = 110
-        grid_w = cols * card_w + (cols - 1) * pad
-        grid_h = rows * card_h + (rows - 1) * pad
-        start_x = (SCREEN_W - grid_w) // 2
-        start_y = (SCREEN_H - grid_h) // 2 + 40
-
-        def idx_at(pos):
-            mx, my = pos
-            for r in range(rows):
-                for c in range(cols):
-                    x = start_x + c * (card_w + pad)
-                    y = start_y + r * (card_h + pad)
-                    rect = pygame.Rect(x, y, card_w, card_h)
-                    if rect.collidepoint(mx, my):
-                        return r * cols + c
-            return None
-
-        while True:
-            dt = clock.tick(FPS) / 1000.0
-            lock = max(0.0, lock - dt)
-
-            for e in pygame.event.get():
-                if e.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit(0)
-                if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
-                    return False
-                if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 and lock <= 0:
-                    i = idx_at(e.pos)
-                    if i is None or matched[i] or revealed[i]:
-                        continue
-                    revealed[i] = True
-                    if first is None:
-                        first = i
-                    else:
-                        a, b = first, i
-                        first = None
-                        if values[a] == values[b]:
-                            matched[a] = matched[b] = True
-                        else:
-                            lock = 0.7
-                            pending_hide = (a, b)
-
-            if pending_hide is not None and lock <= 0:
-                a, b = pending_hide
-                if not matched[a]:
-                    revealed[a] = False
-                if not matched[b]:
-                    revealed[b] = False
-                pending_hide = None
-
-            if all(matched):
-                return True
-
-            screen.fill((18, 20, 26))
-            draw_text(
-                screen,
-                font,
-                "小遊戲2：翻牌配對｜全部完成過關｜ESC 放棄",
-                WHITE,
-                pygame.Rect(50, 60, SCREEN_W - 100, 40),
-                wrap=False,
-            )
-
-            for r in range(rows):
-                for c in range(cols):
-                    i = r * cols + c
-                    x = start_x + c * (card_w + pad)
-                    y = start_y + r * (card_h + pad)
-                    rect = pygame.Rect(x, y, card_w, card_h)
-
-                    if matched[i]:
-                        pygame.draw.rect(screen, (90, 170, 110), rect, border_radius=14)
-                        draw_text(screen, font, f"✓{values[i]}", BLACK, rect.inflate(-16, -16))
-                    elif revealed[i]:
-                        pygame.draw.rect(screen, (230, 230, 240), rect, border_radius=14)
-                        draw_text(screen, font, f"{values[i]}", BLACK, rect.inflate(-16, -16))
-                    else:
-                        pygame.draw.rect(screen, (70, 80, 95), rect, border_radius=14)
-
-            pygame.display.flip()
-
-
-class MiniGame3_Dodge(MiniGameBase):
-    name = "mg3"
-
-    def run(self, screen, clock, font):
-        player = pygame.Rect(SCREEN_W // 2 - 18, SCREEN_H // 2 - 18, 36, 36)
-        speed = 320
-        enemies: List[pygame.Rect] = []
-        enemy_speed = 240
-        spawn_t = 0.0
-        survive = 0.0
-        target = 20.0
-
-        while True:
-            dt = clock.tick(FPS) / 1000.0
-            survive += dt
-            spawn_t += dt
-
-            for e in pygame.event.get():
-                if e.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit(0)
-                if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
-                    return False
-
-            keys = pygame.key.get_pressed()
-            dx = (keys[pygame.K_d] or keys[pygame.K_RIGHT]) - (keys[pygame.K_a] or keys[pygame.K_LEFT])
-            dy = (keys[pygame.K_s] or keys[pygame.K_DOWN]) - (keys[pygame.K_w] or keys[pygame.K_UP])
-            if dx and dy:
-                norm = 1 / math.sqrt(2)
-                dx *= norm
-                dy *= norm
-            player.x += int(dx * speed * dt)
-            player.y += int(dy * speed * dt)
-            player.x = int(clamp(player.x, 20, SCREEN_W - player.w - 20))
-            player.y = int(clamp(player.y, 120, SCREEN_H - player.h - 20))
-
-            if spawn_t >= 0.9:
-                spawn_t = 0.0
-                side = random.choice(["l", "r", "t", "b"])
-                if side == "l":
-                    rect = pygame.Rect(-40, random.randint(120, SCREEN_H - 40), 30, 30)
-                elif side == "r":
-                    rect = pygame.Rect(SCREEN_W + 10, random.randint(120, SCREEN_H - 40), 30, 30)
-                elif side == "t":
-                    rect = pygame.Rect(random.randint(0, SCREEN_W - 40), 80, 30, 30)
-                else:
-                    rect = pygame.Rect(random.randint(0, SCREEN_W - 40), SCREEN_H + 10, 30, 30)
-                enemies.append(rect)
-
-            for rect in enemies:
-                vx = player.centerx - rect.centerx
-                vy = player.centery - rect.centery
-                dist = max(1.0, math.hypot(vx, vy))
-                rect.x += int((vx / dist) * enemy_speed * dt)
-                rect.y += int((vy / dist) * enemy_speed * dt)
-
-            if any(player.colliderect(e) for e in enemies):
-                return False
-
-            if survive >= target:
-                return True
-
-            screen.fill((14, 18, 24))
-            draw_text(
-                screen,
-                font,
-                "小遊戲3：閃避生存｜撐到 20 秒過關｜ESC 放棄",
-                WHITE,
-                pygame.Rect(50, 60, SCREEN_W - 100, 40),
-                wrap=False,
-            )
-            draw_text(
-                screen,
-                font,
-                f"剩餘：{max(0.0, target - survive):.1f}s",
-                WHITE,
-                pygame.Rect(50, 100, SCREEN_W - 100, 40),
-                wrap=False,
-            )
-
-            pygame.draw.rect(screen, (240, 240, 240), player, border_radius=10)
-            for rect in enemies:
-                pygame.draw.rect(screen, (220, 90, 90), rect, border_radius=8)
-
-            pygame.display.flip()
-
-# -------------------------
 # VN 引擎
 # -------------------------
 class VNEngine:
@@ -461,19 +204,19 @@ class VNEngine:
         self.current_text = ""
         self.waiting_input = False
 
-        # 角色清單（從 YAML 的 ch: 取得）
         self.current_chars: List[Dict[str, Any]] = []
 
         # 打字機狀態
         self._full_text = ""
         self._shown_len = 0
         self._typing = False
-        self._type_acc = 0.0  # time accumulator
+        self._type_acc = 0.0
 
         # 說話者跳動
         self._bounce_name: Optional[str] = None
         self._bounce_t = 0.0
 
+        # choice
         self.choice_active = False
         self.choice_prompt = ""
         self.choice_options: List[Dict[str, Any]] = []
@@ -483,39 +226,79 @@ class VNEngine:
         self._missing_sprite_warn: Optional[str] = None
         self._missing_sprite_warn_t = 0.0
 
+    # -------------------------
+    # 封面
+    # -------------------------
+    def show_cover_screen(self) -> bool:
+        """
+        使用 assets/bg/cover_main.png 的封面
+        中間底部有「點擊後進入遊戲」按鈕
+        回傳 True = 進入遊戲, False = 離開
+        """
+        W, H = self.screen.get_size()
+
+        cover_img = self.assets.image_fit_screen("bg/cover_main.png")
+
+        bw, bh = 360, 70
+        btn = pygame.Rect(0, 0, bw, bh)
+        btn.center = (W // 2, int(H * 0.78))
+
+        btn_font = pygame.font.SysFont("Microsoft JhengHei", 28, bold=True)
+        tip_font = pygame.font.SysFont("Microsoft JhengHei", 20)
+
+        while True:
+            self.clock.tick(FPS)
+            mx, my = pygame.mouse.get_pos()
+
+            for e in pygame.event.get():
+                if e.type == pygame.QUIT:
+                    return False
+                if e.type == pygame.KEYDOWN:
+                    if e.key == pygame.K_ESCAPE:
+                        return False
+                    if e.key in (pygame.K_RETURN, pygame.K_SPACE):
+                        return True
+                if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+                    if btn.collidepoint(mx, my):
+                        return True
+
+            self.screen.blit(cover_img, (0, 0))
+
+            # 讓按鈕更清楚（淡黑遮罩）
+            overlay = pygame.Surface((W, H), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 40))
+            self.screen.blit(overlay, (0, 0))
+
+            hover = btn.collidepoint(mx, my)
+            pygame.draw.rect(
+                self.screen,
+                (245, 245, 245) if hover else (220, 220, 228),
+                btn,
+                border_radius=18
+            )
+            pygame.draw.rect(self.screen, (255, 255, 255), btn, width=2, border_radius=18)
+
+            txt = btn_font.render("點擊後進入遊戲", True, (25, 25, 30))
+            self.screen.blit(txt, txt.get_rect(center=btn.center))
+
+            tip = tip_font.render("Enter / Space 也可開始｜ESC 離開", True, (230, 230, 235))
+            self.screen.blit(tip, tip.get_rect(center=(W // 2, btn.bottom + 28)))
+
+            pygame.display.flip()
+
+    # -------------------------
+    # 內部工具
+    # -------------------------
     def _set_missing_warn(self, msg: str):
         self._missing_sprite_warn = msg
         self._missing_sprite_warn_t = 2.0  # 顯示 2 秒
-
-    def goto(self, node_id: str):
-        if node_id not in self.script.nodes:
-            raise KeyError(f"找不到節點：{node_id}")
-        self.node_id = node_id
-        self.current_name = ""
-        self.current_text = ""
-        self.waiting_input = False
-        self.choice_active = False
-        self.choice_prompt = ""
-        self.choice_options = []
-        self.choice_hover = -1
-        self.current_chars = []
-
-        # reset typing
-        self._full_text = ""
-        self._shown_len = 0
-        self._typing = False
-        self._type_acc = 0.0
-
-        # reset bounce
-        self._bounce_name = None
-        self._bounce_t = 0.0
 
     def _start_typing(self, full_text: str):
         self._full_text = full_text
         self._shown_len = 0
         self._typing = True
         self._type_acc = 0.0
-        self.current_text = ""  # 畫面顯示用
+        self.current_text = ""
 
     def _finish_typing(self):
         self._typing = False
@@ -535,9 +318,6 @@ class VNEngine:
                 self._typing = False
 
     def _start_bounce_if_needed(self):
-        """
-        如果 speaker 在 current_chars 之中，觸發那個角色跳一下。
-        """
         spk = (self.current_name or "").strip()
         if not spk or spk.upper() == "NARRATOR":
             self._bounce_name = None
@@ -553,14 +333,54 @@ class VNEngine:
         self._bounce_name = None
         self._bounce_t = 0.0
 
+    def goto(self, node_id: str):
+        # ✅ 支援 next: END 這種寫法（避免 KeyError）
+        if str(node_id).upper() == "END":
+            self.node_id = "END"
+            self.current_name = ""
+            self.current_chars = []
+            self.choice_active = False
+            self.choice_prompt = ""
+            self.choice_options = []
+            self.choice_hover = -1
+            self.waiting_input = True
+
+            self._start_typing("THE END（按 ESC 離開）")
+            self._start_bounce_if_needed()
+            return
+
+        if node_id not in self.script.nodes:
+            raise KeyError(f"找不到節點：{node_id}")
+
+        self.node_id = node_id
+        self.current_name = ""
+        self.current_text = ""
+        self.waiting_input = False
+        self.choice_active = False
+        self.choice_prompt = ""
+        self.choice_options = []
+        self.choice_hover = -1
+        self.current_chars = []
+
+        self._full_text = ""
+        self._shown_len = 0
+        self._typing = False
+        self._type_acc = 0.0
+
+        self._bounce_name = None
+        self._bounce_t = 0.0
+
     def next_step(self):
+        # ✅ END 直接顯示，不讀 YAML
+        if self.node_id == "END":
+            self.waiting_input = True
+            return
+
         node = self.script.nodes[self.node_id]
         t = str(node.get("type", "dialogue"))
 
-        # 讀入角色列表
         self.current_chars = node.get("ch", []) or []
 
-        # bg: bedroom_bg -> assets/bg/bedroom_bg.png
         bg_key = node.get("bg")
         if bg_key:
             bg_key = str(bg_key)
@@ -577,7 +397,6 @@ class VNEngine:
             self._start_bounce_if_needed()
             return
 
-        # 小遊戲插入（你的 goto_minigame: 1/2/3）
         if node.get("goto_minigame") is not None:
             mg_map = {1: "mg1", 2: "mg2", 3: "mg3"}
             mg_id = mg_map.get(int(node["goto_minigame"]))
@@ -614,9 +433,7 @@ class VNEngine:
 
             self.choice_active = True
             self.waiting_input = True
-
-            # choice 也可以顯示提示文字（打字機）
-            self._start_typing("")  # 不顯示對話文字，只留面板
+            self._start_typing("")  # choice 不顯示正文
             self._start_bounce_if_needed()
             return
 
@@ -653,7 +470,6 @@ class VNEngine:
                 return
 
     def _draw_char_sprite(self, name: str, expression: str) -> pygame.Surface:
-        # 圖片路徑：assets/ch/<name>/<expression>.png
         rel = f"ch/{name}/{expression}.png"
         return self.assets.image(rel)
 
@@ -671,19 +487,17 @@ class VNEngine:
         t = self._bounce_t
         if t < 0 or t > BOUNCE_DURATION:
             return 0
-        # 使用 sin 做「上去再回來」
         phase = (t / BOUNCE_DURATION) * math.pi
         return int(-math.sin(phase) * BOUNCE_HEIGHT)
 
     def draw(self):
-        # background
         if self.bg_path:
             bg = self.assets.image_fit_screen(self.bg_path)
             self.screen.blit(bg, (0, 0))
         else:
             self.screen.fill((16, 18, 22))
 
-        # 先畫角色（在 UI 之前）
+        # 角色
         for c in self.current_chars:
             try:
                 name = str(c.get("name", "")).strip()
@@ -694,7 +508,6 @@ class VNEngine:
 
                 sprite = self._draw_char_sprite(name, exp)
 
-                # scale to target height
                 target_h = int(SCREEN_H * CHAR_HEIGHT_RATIO)
                 scale = target_h / sprite.get_height()
                 target_w = int(sprite.get_width() * scale)
@@ -702,14 +515,11 @@ class VNEngine:
 
                 x = self._char_pos_x(pos, target_w)
                 y = SCREEN_H - target_h - CHAR_BOTTOM_PAD
-
-                # bounce if speaking
                 y += self._bounce_offset(name)
 
                 self.screen.blit(sprite_s, (x, y))
 
             except FileNotFoundError as e:
-                # 顯示缺圖提示，不讓遊戲 crash
                 self._set_missing_warn(str(e))
 
         # choice overlay
@@ -742,41 +552,46 @@ class VNEngine:
             panel = pygame.Surface((DIALOGUE_RECT.w, DIALOGUE_RECT.h), pygame.SRCALPHA)
             panel.fill((20, 20, 26, 190))
             self.screen.blit(panel, (DIALOGUE_RECT.x, DIALOGUE_RECT.y))
-            pygame.draw.rect(self.screen, (255, 255, 255), DIALOGUE_RECT, width=2, border_radius=18)
+            pygame.draw.rect(self.screen, WHITE, DIALOGUE_RECT, width=2, border_radius=18)
 
             if self.current_name:
                 name_panel = pygame.Surface((NAME_RECT.w, NAME_RECT.h), pygame.SRCALPHA)
                 name_panel.fill((30, 30, 36, 210))
                 self.screen.blit(name_panel, (NAME_RECT.x, NAME_RECT.y))
-                pygame.draw.rect(self.screen, (255, 255, 255), NAME_RECT, width=2, border_radius=12)
+                pygame.draw.rect(self.screen, WHITE, NAME_RECT, width=2, border_radius=12)
                 draw_text(self.screen, self.font_name, self.current_name, WHITE, NAME_RECT.inflate(-14, -10), wrap=False)
 
-            text_rect = DIALOGUE_RECT.inflate(-20, -20)
+            text_rect = DIALOGUE_RECT.inflate(-20, -28)
             draw_text(self.screen, self.font, self.current_text, WHITE, text_rect, wrap=True)
 
-            hint = "（左鍵 / Enter：若還在打字→直接顯示全文；否則→下一句｜ESC 離開）"
+            hint = "（左鍵/Enter：打字中→顯示全文；非打字→下一句｜ESC 離開）"
             draw_text(
                 self.screen,
                 self.font_small,
                 hint,
                 (200, 200, 200),
-                pygame.Rect(DIALOGUE_RECT.x, DIALOGUE_RECT.bottom - 28, DIALOGUE_RECT.w, 24),
+                pygame.Rect(DIALOGUE_RECT.x, DIALOGUE_RECT.bottom - 26, DIALOGUE_RECT.w, 24),
                 wrap=False,
             )
 
         # 缺圖警告
         if self._missing_sprite_warn and self._missing_sprite_warn_t > 0:
             warn_rect = pygame.Rect(16, 12, SCREEN_W - 32, 30)
-            draw_text(self.screen, self.font_small, f"[缺立繪] {self._missing_sprite_warn}", (255, 140, 140), warn_rect, wrap=False)
+            draw_text(
+                self.screen,
+                self.font_small,
+                f"[缺立繪] {self._missing_sprite_warn}",
+                (255, 140, 140),
+                warn_rect,
+                wrap=False,
+            )
 
     def _advance(self):
-        """
-        推進：
-        - 若還在打字：先把全文顯示
-        - 否則：走 next
-        """
         if self._typing:
             self._finish_typing()
+            return
+
+        if self.node_id == "END":
             return
 
         cur = self.script.nodes[self.node_id]
@@ -787,13 +602,20 @@ class VNEngine:
 
     def run(self):
         print(">>> VNEngine.run start")
+
+        # ✅ 先跑封面
+        if not self.show_cover_screen():
+            pygame.quit()
+            return
+
+        # ✅ 進入劇情
         self.next_step()
 
         running = True
         while running:
             dt = self.clock.tick(FPS) / 1000.0
 
-            # update typing and bounce and warning timer
+            # typing & bounce & warn
             self._update_typing(dt)
             if self._bounce_name:
                 self._bounce_t += dt
@@ -806,18 +628,22 @@ class VNEngine:
             for e in pygame.event.get():
                 if e.type == pygame.QUIT:
                     running = False
+
                 elif e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
                     running = False
+
                 elif e.type == pygame.MOUSEMOTION:
                     self.update_hover(e.pos)
+
                 elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
                     if self.choice_active:
                         self.handle_choice_click(e.pos)
                     else:
                         self._advance()
+
                 elif e.type == pygame.KEYDOWN and e.key in (pygame.K_RETURN, pygame.K_SPACE):
                     if self.choice_active:
-                        # choice 狀態下 Enter/Space 不做事，避免誤按
+                        # choice 狀態下避免誤觸推進
                         pass
                     else:
                         self._advance()
