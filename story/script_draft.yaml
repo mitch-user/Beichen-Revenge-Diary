@@ -288,7 +288,7 @@ nodes:
   bg: rooftop_night_bg
   ch:
     - name: 林溪然
-      pos: center
+      pos: right
       expression: happy
     - name: 顧北辰
       pos: left
@@ -303,7 +303,7 @@ nodes:
   bg: rooftop_night_bg
   ch:
     - name: 林溪然
-      pos: center
+      pos: right
       expression: happy
   speaker: NARRATOR
   text: "顧北辰緩緩單膝跪地，打開了戒指盒。\n夜色中，鑽石映著微光。"
@@ -315,7 +315,7 @@ nodes:
   bg: rooftop_night_bg
   ch:
     - name: 林溪然
-      pos: center
+      pos: right
       expression: happy
   speaker: 林溪然
   text: "你真的想清楚了嗎？\n這一次，不會再讓我失望了嗎？"
@@ -339,7 +339,7 @@ nodes:
   bg: rooftop_night_bg
   ch:
     - name: 林溪然
-      pos: center
+      pos: right
       expression: happy
   speaker: 林溪然
   text: "……笨蛋。\n這種問題，還用問嗎？"
