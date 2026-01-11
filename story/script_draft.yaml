@@ -1,4 +1,8 @@
-第一章
+meta:
+  start: CH1_001
+
+nodes:
+# ===== 第一章 =====
 - id: CH1_001
   chapter: CH1
   type: dialogue
@@ -15,7 +19,7 @@
   ch:
     - name: 顧北辰
       pos: center
-      expression: pain
+      expression: sad
   speaker: 顧北辰
   text: "……痾…嗯…。 \n這裡是哪裡？\n我不是……死了嗎？"
   next: CH1_003
@@ -36,7 +40,7 @@
   ch:
     - name: 顧北辰
       pos: center
-      expression: confuse
+      expression: normal
   speaker: 顧北辰
   text: "等等……這是我出車禍那天？\n我重生了。"
   next: CH1_005
@@ -57,7 +61,7 @@
   ch:
     - name: 顧北辰
       pos: center
-      expression: cold
+      expression: normal
   speaker: 顧北辰
   text: "上一世，顧南辰和柳如煙聯手奪走我的一切。\n只為顧氏集團的繼承權。"
   next: CH1_007
@@ -81,7 +85,7 @@
   ch:
     - name: 顧北辰
       pos: center
-      expression: resolve
+      expression: normal
   speaker: NARRATOR
   text: "你打開手機，螢幕上跳出兩條訊息。\n\n顧南辰：「哥，快開會了你怎麼還沒來？」\n林溪然：「親愛的，今天我跟姊妹去逛街，就不跟你吃晚餐了喔。」\n\n你暗暗握緊手機。"
   next: CH1_009
@@ -93,7 +97,7 @@
   ch:
     - name: 顧北辰
       pos: center
-      expression: cold
+      expression: normal
   speaker: 顧北辰
   text: "竟敢暗算我……你們給我等著。\n我會先解決你們。"
   next: CH1_010
@@ -117,3 +121,252 @@
   choices:
     - text: "先去會顧南辰（進入第二章）"
       goto: CH2_001
+
+# ===== 第二章 =====
+- id: CH2_001
+  chapter: CH2
+  type: dialogue
+  bg: company_bg
+  ch: []
+  speaker: NARRATOR
+  text: "你坐在辦公室等待顧南辰的到來。\n柳如煙也在辦公室陪你，而你卻心不在焉，盤算接下來的計畫……"
+  next: CH2_002
+
+- id: CH2_002
+  chapter: CH2
+  type: dialogue
+  bg: company_bg
+  ch:
+    - name: 顧北辰
+      pos: left
+      expression: normal
+    - name: 顧南辰
+      pos: right
+      expression: normal
+  speaker: 顧南辰
+  text: "哥，好久不見。\n昨天你沒來開會是發生什麼事了嗎？"
+  next: CH2_003
+
+- id: CH2_003
+  chapter: CH2
+  type: dialogue
+  bg: company_bg
+  ch:
+    - name: 顧北辰
+      pos: left
+      expression: normal
+    - name: 顧南辰
+      pos: right
+      expression: normal
+  speaker: 顧北辰
+  text: "確實有些事耽擱了。\n你看看這些是什麼……"
+  next: CH2_004
+
+- id: CH2_004
+  chapter: CH2
+  type: dialogue
+  bg: company_bg
+  ch: []
+  speaker: NARRATOR
+  text: "你拿出一疊文件狠狠拍在桌上。\n散落的文件寫滿顧南辰之前做過的計畫，包括那場車禍，以及他們倆廝混在一起的證據。"
+  next: CH2_005
+
+- id: CH2_005
+  chapter: CH2
+  type: dialogue
+  bg: company_bg
+  ch:
+    - name: 柳如煙
+      pos: right
+      expression: shock
+  speaker: 柳如煙
+  text: "北辰，你聽我解釋。\n事情不是你想的那樣！"
+  next: CH2_006
+
+- id: CH2_006
+  chapter: CH2
+  type: dialogue
+  bg: company_bg
+  ch:
+    - name: 顧南辰
+      pos: right
+      expression: shock
+  speaker: 顧南辰
+  text: "哥！其中一定有什麼誤會。"
+  goto_minigame: 1
+  next: CH3_001
+
+# ===== 第三章 =====
+- id: CH3_001
+  chapter: CH3
+  type: dialogue
+  bg: old_house_bg
+  ch:
+    - name: 顧老爺
+      pos: center
+      expression: normal
+  speaker: 顧老爺
+  text: "繼承權不是靠血緣。\n是靠你能不能在局裡活下來。"
+  next: CH3_002
+
+- id: CH3_002
+  chapter: CH3
+  type: dialogue
+  bg: old_house_bg
+  ch: []
+  speaker: NARRATOR
+  text: "桌上是一份看似普通的文件。\n但每一格，都可能是陷阱。"
+  next: CH3_003
+
+- id: CH3_003
+  chapter: CH3
+  type: dialogue
+  bg: old_house_bg
+  ch:
+    - name: 顧老爺
+      pos: center
+      expression: normal
+  speaker: 顧老爺
+  text: "這是一直讓我很頭痛的案子。\n證明給我看，你的實力夠不夠格帶領顧氏集團！"
+  goto_minigame: 2
+  next: CH4_001
+
+# ===== 第四章 =====
+- id: CH4_001
+  chapter: CH4
+  type: dialogue
+  bg: cafes_bg
+  ch:
+    - name: 林溪然
+      pos: right
+      expression: sad
+    - name: 顧北辰
+      pos: left
+      expression: normal
+  speaker: 林溪然
+  text: "顧北辰，你來晚了。\n有些事，不是重來一次就能補回。"
+  next: CH4_002
+
+- id: CH4_002
+  chapter: CH4
+  type: dialogue
+  bg: cafes_bg
+  ch:
+    - name: 林溪然
+      pos: right
+      expression: sad
+    - name: 顧北辰
+      pos: left
+      expression: normal
+  speaker: 顧北辰
+  text: "然然，是我錯了。\n過去是我被利益蒙蔽雙眼，求你在給我一次機會吧。"
+  next: CH4_003
+
+- id: CH4_003
+  chapter: CH4
+  type: dialogue
+  bg: cafes_bg
+  ch: []
+  speaker: NARRATOR
+  text: "你必須用行動證明你的選擇。\n才能挽回然然的心意。"
+  goto_minigame: 3
+  next: CH5_001
+
+# ===== 第五章 =====
+- id: CH5_001
+  chapter: CH5
+  type: dialogue
+  bg: rooftop_night_bg
+  ch: []
+  speaker: NARRATOR
+  text: "夜風輕拂。\n城市的燈火在腳下延展開來。\n你站在天台邊，手心緊握著那枚戒指。"
+  next: CH5_002
+
+- id: CH5_002
+  chapter: CH5
+  type: dialogue
+  bg: rooftop_night_bg
+  ch:
+    - name: 林溪然
+      pos: center
+      expression: happy
+    - name: 顧北辰
+      pos: left
+      expression: nervous
+  speaker: 顧北辰
+  text: "然然，這一次我沒有逃避。\n也沒有被任何利益左右。\n我想要的，只有你。"
+  next: CH5_003
+
+- id: CH5_003
+  chapter: CH5
+  type: dialogue
+  bg: rooftop_night_bg
+  ch:
+    - name: 林溪然
+      pos: center
+      expression: happy
+  speaker: NARRATOR
+  text: "顧北辰緩緩單膝跪地，打開了戒指盒。\n夜色中，鑽石映著微光。"
+  next: CH5_004
+
+- id: CH5_004
+  chapter: CH5
+  type: dialogue
+  bg: rooftop_night_bg
+  ch:
+    - name: 林溪然
+      pos: center
+      expression: happy
+  speaker: 林溪然
+  text: "你真的想清楚了嗎？\n這一次，不會再讓我失望了嗎？"
+  next: CH5_005
+
+- id: CH5_005
+  chapter: CH5
+  type: dialogue
+  bg: rooftop_night_bg
+  ch:
+    - name: 顧北辰
+      pos: left
+      expression: normal
+  speaker: 顧北辰
+  text: "我用整個未來向你保證。\n嫁給我，好嗎？"
+  next: CH5_006
+
+- id: CH5_006
+  chapter: CH5
+  type: dialogue
+  bg: rooftop_night_bg
+  ch:
+    - name: 林溪然
+      pos: center
+      expression: happy
+  speaker: 林溪然
+  text: "……笨蛋。\n這種問題，還用問嗎？"
+  next: CH5_007
+
+- id: CH5_007
+  chapter: CH5
+  type: dialogue
+  bg: boardroom_bg
+  ch: []
+  speaker: NARRATOR
+  text: "不久後，在董事會上。\n顧老爺正式宣布，顧北辰成為顧氏集團的唯一繼承人。"
+  next: CH5_008
+
+- id: CH5_008
+  chapter: CH5
+  type: dialogue
+  bg: wedding_bg
+  ch: []
+  speaker: NARRATOR
+  text: "陽光灑落在潔白的禮堂。\n你牽著林溪然的手，走向全新的未來。\n\n這一世，你守住了愛情，也守住了一切。"
+  next: END
+
+- id: END
+  chapter: END
+  type: end
+  bg: wedding_bg
+  ch: []
+  speaker: NARRATOR
+  text: "THE END"
