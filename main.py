@@ -1,8 +1,7 @@
-# main.py
+# main.py (完整可覆蓋版本)
 import os
 import sys
 import math
-import random
 from typing import Any, Dict, List, Optional, Tuple
 
 import pygame
@@ -11,14 +10,23 @@ import yaml
 from minigames import MINIGAMES
 
 # -------------------------
+# PyInstaller / 資源路徑
+# -------------------------
+def resource_path(relative_path: str) -> str:
+    """取得資源的絕對路徑（同時支援：原始碼執行 & PyInstaller 打包後執行）"""
+    if hasattr(sys, "_MEIPASS"):
+        base_path = sys._MEIPASS  # type: ignore[attr-defined]
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, relative_path)
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# -------------------------
 # 基本設定
 # -------------------------
 SCREEN_W, SCREEN_H = 1280, 720
 FPS = 60
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ASSETS_DIR = os.path.join(BASE_DIR, "assets")
-STORY_PATH = os.path.join(BASE_DIR, "story", "script_draft.yaml")
 
 # UI layout
 DIALOGUE_H = int(SCREEN_H * 0.28)
@@ -31,24 +39,22 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 DIM = (0, 0, 0, 160)
 
-# 角色立繪顯示比例（高度佔螢幕）
+# 角色立繪顯示比例
 CHAR_HEIGHT_RATIO = 0.82
 CHAR_BOTTOM_PAD = 12
 
 # 打字機效果
-TYPE_SPEED_CHARS_PER_SEC = 40  # 每秒顯示幾個字（可調）
+TYPE_SPEED_CHARS_PER_SEC = 40
 
 # 角色跳動效果
-BOUNCE_DURATION = 0.22  # 秒
-BOUNCE_HEIGHT = 14      # 像素
-
+BOUNCE_DURATION = 0.22
+BOUNCE_HEIGHT = 14
 
 # -------------------------
 # 工具
 # -------------------------
 def clamp(v: float, a: float, b: float) -> float:
     return max(a, min(b, v))
-
 
 def draw_text(
     surface: pygame.Surface,
@@ -96,7 +102,6 @@ def draw_text(
         if p_i != len(paragraphs) - 1:
             y += int(line_spacing * 0.5)
 
-
 def load_yaml(path: str) -> Dict[str, Any]:
     if not os.path.exists(path):
         raise FileNotFoundError(f"找不到劇本檔：{path}")
@@ -106,11 +111,55 @@ def load_yaml(path: str) -> Dict[str, Any]:
         raise ValueError("YAML 最上層必須是 dict（例如 meta/nodes）")
     return raw
 
-
 def safe_join(base: str, rel: str) -> str:
     rel = rel.replace("\\", "/").lstrip("/")
     return os.path.join(base, rel)
 
+# -------------------------
+# BGM：只找 main_bgm（不管副檔名）
+# -------------------------
+def find_bgm_file(name_no_ext: str) -> Optional[str]:
+    """
+    會在以下位置找：
+      - assets/bgm/main_bgm.(mp3/ogg/wav)
+      - assets/audio/main_bgm.(mp3/ogg/wav)
+    ※ 使用 resource_path 兼容打包
+    """
+    folders = [
+        resource_path(os.path.join("assets", "bgm")),
+        resource_path(os.path.join("assets", "audio")),
+    ]
+    exts = [".mp3", ".ogg", ".wav"]
+
+    for folder in folders:
+        if not os.path.isdir(folder):
+            continue
+        for ext in exts:
+            p = os.path.join(folder, name_no_ext + ext)
+            if os.path.exists(p):
+                return p
+    return None
+
+def try_start_bgm(volume: float) -> None:
+    """
+    封面開始播，進遊戲不換，循環播放
+    """
+    bgm_path = find_bgm_file("main_bgm")
+    if not bgm_path:
+        print("[提示] 找不到 BGM 檔案。請放在以下任一位置：")
+        print(" -", resource_path(os.path.join("assets", "bgm", "main_bgm.mp3")))
+        print(" -", resource_path(os.path.join("assets", "bgm", "main_bgm.ogg")))
+        print(" -", resource_path(os.path.join("assets", "audio", "main_bgm.mp3")))
+        print(" -", resource_path(os.path.join("assets", "audio", "main_bgm.ogg")))
+        return
+
+    try:
+        pygame.mixer.music.load(bgm_path)
+        pygame.mixer.music.set_volume(clamp(volume, 0.0, 1.0))
+        pygame.mixer.music.play(-1)  # loop
+        print("[BGM] 播放：", bgm_path)
+    except Exception as e:
+        print("[提示] BGM 播放失敗：", e)
 
 # -------------------------
 # 資源管理（圖片快取）
@@ -125,7 +174,7 @@ class AssetManager:
         if key in self._img:
             return self._img[key]
 
-        full = safe_join(ASSETS_DIR, key)
+        full = resource_path(os.path.join("assets", key))
         if not os.path.exists(full):
             raise FileNotFoundError(f"找不到圖片：{full}")
 
@@ -137,9 +186,8 @@ class AssetManager:
         img = self.image(rel_path)
         return pygame.transform.smoothscale(img, (SCREEN_W, SCREEN_H))
 
-
 # -------------------------
-# 劇本（nodes 格式）
+# 劇本
 # -------------------------
 class Script:
     def __init__(self, raw: Dict[str, Any]):
@@ -160,12 +208,11 @@ class Script:
         if self.start_id not in self.nodes:
             raise ValueError(f"start id 不存在：{self.start_id}")
 
-
 # -------------------------
 # VN 引擎
 # -------------------------
 class VNEngine:
-    def __init__(self, screen: pygame.Surface, clock: pygame.time.Clock, assets: "AssetManager", script: Script):
+    def __init__(self, screen: pygame.Surface, clock: pygame.time.Clock, assets: AssetManager, script: Script):
         self.screen = screen
         self.clock = clock
         self.assets = assets
@@ -184,47 +231,158 @@ class VNEngine:
 
         self.current_chars: List[Dict[str, Any]] = []
 
-        # 打字機狀態
+        # typing
         self._full_text = ""
         self._shown_len = 0
         self._typing = False
         self._type_acc = 0.0
 
-        # 說話者跳動
+        # bounce
         self._bounce_name: Optional[str] = None
         self._bounce_t = 0.0
 
+        # choice
         self.choice_active = False
         self.choice_prompt = ""
         self.choice_options: List[Dict[str, Any]] = []
         self.choice_hover = -1
 
-        # 缺圖提示
+        # missing warn
         self._missing_sprite_warn: Optional[str] = None
         self._missing_sprite_warn_t = 0.0
 
-        # ✅ 轉場設定
+        # fade
         self.FADE_OUT_SEC = 0.28
         self.FADE_IN_SEC = 0.28
+
+        # volume (0~1)
+        self.master_volume = 0.5
 
     def _set_missing_warn(self, msg: str):
         self._missing_sprite_warn = msg
         self._missing_sprite_warn_t = 2.0
 
     # -------------------------
-    # 封面
+    # 封面 + 音量設定
     # -------------------------
+    def _draw_button(self, rect: pygame.Rect, text: str, hover: bool):
+        pygame.draw.rect(self.screen, (245, 245, 245) if hover else (220, 220, 228), rect, border_radius=16)
+        pygame.draw.rect(self.screen, (255, 255, 255), rect, width=2, border_radius=16)
+        f = pygame.font.SysFont("Microsoft JhengHei", 22, bold=True)
+        img = f.render(text, True, (25, 25, 30))
+        self.screen.blit(img, img.get_rect(center=rect.center))
+
+    def show_volume_screen(self) -> bool:
+        """
+        音量設定頁：調整 master_volume，立即套用到 pygame.mixer.music
+        ESC / 返回 按鈕：回封面
+        """
+        W, H = self.screen.get_size()
+        font_title = pygame.font.SysFont("Microsoft JhengHei", 40, bold=True)
+        font_tip = pygame.font.SysFont("Microsoft JhengHei", 20)
+
+        back_img = self.assets.image_fit_screen("bg/cover_main.png")
+
+        panel = pygame.Rect(0, 0, 760, 360)
+        panel.center = (W // 2, H // 2)
+
+        # slider
+        bar = pygame.Rect(0, 0, 520, 10)
+        bar.center = (panel.centerx, panel.centery + 20)
+        knob_r = 14
+
+        btn_back = pygame.Rect(0, 0, 220, 52)
+        btn_back.center = (panel.centerx, panel.bottom - 60)
+
+        dragging = False
+
+        def set_vol_from_mouse(mx: int):
+            x = clamp(mx, bar.left, bar.right)
+            t = (x - bar.left) / bar.width
+            self.master_volume = float(clamp(t, 0.0, 1.0))
+            pygame.mixer.music.set_volume(self.master_volume)
+
+        while True:
+            self.clock.tick(FPS)
+            mx, my = pygame.mouse.get_pos()
+
+            for e in pygame.event.get():
+                if e.type == pygame.QUIT:
+                    return False
+                if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
+                    return True
+                if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+                    if btn_back.collidepoint(mx, my):
+                        return True
+                    # knob hit
+                    knob_x = int(bar.left + self.master_volume * bar.width)
+                    if pygame.Rect(knob_x - knob_r, bar.centery - knob_r, knob_r * 2, knob_r * 2).collidepoint(mx, my):
+                        dragging = True
+                    elif bar.collidepoint(mx, my):
+                        dragging = True
+                        set_vol_from_mouse(mx)
+                if e.type == pygame.MOUSEBUTTONUP and e.button == 1:
+                    dragging = False
+                if e.type == pygame.MOUSEMOTION and dragging:
+                    set_vol_from_mouse(mx)
+
+            # draw
+            self.screen.blit(back_img, (0, 0))
+            overlay = pygame.Surface((W, H), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 80))
+            self.screen.blit(overlay, (0, 0))
+
+            pygame.draw.rect(self.screen, (20, 20, 26), panel, border_radius=18)
+            pygame.draw.rect(self.screen, (255, 255, 255), panel, width=2, border_radius=18)
+
+            title = font_title.render("音量設定", True, WHITE)
+            self.screen.blit(title, title.get_rect(center=(panel.centerx, panel.top + 70)))
+
+            # bar
+            pygame.draw.rect(self.screen, (255, 255, 255), bar, border_radius=8)
+            fill = pygame.Rect(bar.left, bar.top, int(bar.width * self.master_volume), bar.height)
+            pygame.draw.rect(self.screen, (245, 198, 75), fill, border_radius=8)
+
+            knob_x = int(bar.left + self.master_volume * bar.width)
+            pygame.draw.circle(self.screen, (245, 245, 245), (knob_x, bar.centery), knob_r)
+            pygame.draw.circle(self.screen, (40, 40, 50), (knob_x, bar.centery), knob_r, 2)
+
+            vol_text = font_tip.render(f"音量：{int(self.master_volume * 100)}%", True, (230, 230, 235))
+            self.screen.blit(vol_text, vol_text.get_rect(center=(panel.centerx, bar.bottom + 35)))
+
+            hover_back = btn_back.collidepoint(mx, my)
+            self._draw_button(btn_back, "返回封面", hover_back)
+
+            tip = font_tip.render("拖曳圓點或點擊白色音量條調整｜ESC 返回", True, (235, 235, 240))
+            self.screen.blit(tip, tip.get_rect(center=(panel.centerx, panel.bottom - 20)))
+
+            pygame.display.flip()
+
     def show_cover_screen(self) -> bool:
+        """
+        封面：兩顆按鈕
+        - 開始遊戲
+        - 音量設定
+        需求調整：
+        ✅ 兩個按鈕更近
+        ✅ 整體往上移 0.2（螢幕高度 20%）
+        """
         W, H = self.screen.get_size()
         cover_img = self.assets.image_fit_screen("bg/cover_main.png")
-
-        # ✅ 按鈕更小 + 往下移
-        bw, bh = 280, 50
-        btn = pygame.Rect(0, 0, bw, bh)
-        btn.center = (W // 2, int(H * 0.90))
-
-        btn_font = pygame.font.SysFont("Microsoft JhengHei", 22, bold=True)
         tip_font = pygame.font.SysFont("Microsoft JhengHei", 16)
+
+        # 按鈕：更小
+        bw, bh = 240, 40
+        btn_start = pygame.Rect(0, 0, bw, bh)
+        btn_volume = pygame.Rect(0, 0, bw, bh)
+
+        # ✅ 原本大概在 0.90H，現在「整體往上移 0.2H」
+        base_y = int(H * 0.90) - int(H * 0.05)  # 往上移 20% 螢幕高度
+
+        # ✅ 兩顆按鈕更近（間距縮小）
+        gap = 5
+        btn_start.center = (W // 2, base_y)
+        btn_volume.center = (W // 2, base_y + bh + gap)
 
         while True:
             self.clock.tick(FPS)
@@ -239,24 +397,23 @@ class VNEngine:
                     if e.key in (pygame.K_RETURN, pygame.K_SPACE):
                         return True
                 if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
-                    if btn.collidepoint(mx, my):
+                    if btn_start.collidepoint(mx, my):
                         return True
+                    if btn_volume.collidepoint(mx, my):
+                        ok = self.show_volume_screen()
+                        if not ok:
+                            return False
 
             self.screen.blit(cover_img, (0, 0))
-
             overlay = pygame.Surface((W, H), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 45))
             self.screen.blit(overlay, (0, 0))
 
-            hover = btn.collidepoint(mx, my)
-            pygame.draw.rect(self.screen, (245, 245, 245) if hover else (220, 220, 228), btn, border_radius=16)
-            pygame.draw.rect(self.screen, (255, 255, 255), btn, width=2, border_radius=16)
-
-            txt = btn_font.render("點擊後進入遊戲", True, (25, 25, 30))
-            self.screen.blit(txt, txt.get_rect(center=btn.center))
+            self._draw_button(btn_start, "點擊後進入遊戲", btn_start.collidepoint(mx, my))
+            self._draw_button(btn_volume, "音量設定", btn_volume.collidepoint(mx, my))
 
             tip = tip_font.render("Enter / Space 也可開始｜ESC 離開", True, (235, 235, 240))
-            self.screen.blit(tip, tip.get_rect(center=(W // 2, btn.bottom + 22)))
+            self.screen.blit(tip, tip.get_rect(center=(W // 2, btn_volume.bottom + 20)))
 
             pygame.display.flip()
 
@@ -276,7 +433,7 @@ class VNEngine:
         return f"bg/{bg_key}.png"
 
     # -------------------------
-    # 黑幕轉場（fade）
+    # 黑幕轉場
     # -------------------------
     def _fade_to_black(self, seconds: float) -> bool:
         t = 0.0
@@ -332,9 +489,8 @@ class VNEngine:
 
     def _transition_to_node(self, node_id: str, force: bool = False) -> bool:
         """
-        ✅ 轉場策略：
-        - force=True：無論背景是否相同，都做黑幕淡出（用於 進小遊戲 / 回主線）
-        - force=False：只有背景不同才做黑幕淡出（一般對話/選項切換）
+        - force=True：無論背景是否相同，都做轉場（進/出小遊戲用）
+        - force=False：只有背景不同才做轉場（一般對話/場景切換）
         """
         target_id = node_id
         if target_id not in self.script.nodes:
@@ -367,10 +523,12 @@ class VNEngine:
     def goto(self, node_id: str):
         if node_id not in self.script.nodes:
             raise KeyError(f"找不到節點：{node_id}")
+
         self.node_id = node_id
         self.current_name = ""
         self.current_text = ""
         self.waiting_input = False
+
         self.choice_active = False
         self.choice_prompt = ""
         self.choice_options = []
@@ -447,9 +605,8 @@ class VNEngine:
             self._start_bounce_if_needed()
             return
 
-        # ✅ 小遊戲插入：進入前做一次 forced fade
+        # 小遊戲插入：進/出都做轉場
         if node.get("goto_minigame") is not None:
-            # 進小遊戲前：黑幕淡出（強制）
             if not self._fade_to_black(self.FADE_OUT_SEC):
                 pygame.quit()
                 sys.exit(0)
@@ -459,10 +616,9 @@ class VNEngine:
             if not mg_id:
                 raise ValueError(f"未知 goto_minigame：{node['goto_minigame']}（只支援 1/2/3）")
 
+            # (小遊戲本身會處理 return True/False)
             _passed = MINIGAMES[mg_id].run(self.screen, self.clock, self.font_small)
 
-            # 回主線後：淡入（讓回來也有感）
-            # 先切回 next 節點（強制轉場：就算背景相同也做）
             nxt = node.get("next")
             if nxt:
                 ok = self._transition_to_node(str(nxt), force=True)
@@ -470,7 +626,6 @@ class VNEngine:
                     pygame.quit()
                     sys.exit(0)
             else:
-                # 沒 next 就直接淡入回當前畫面
                 self._fade_from_black(self.FADE_IN_SEC)
             return
 
@@ -665,6 +820,7 @@ class VNEngine:
     def run(self):
         print(">>> VNEngine.run start")
 
+        # 封面（這裡已經在 main() 開始 BGM 了，所以封面會播）
         if not self.show_cover_screen():
             pygame.quit()
             return
@@ -689,20 +845,16 @@ class VNEngine:
             for e in pygame.event.get():
                 if e.type == pygame.QUIT:
                     running = False
-
                 elif e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
                     running = False
-
                 elif e.type == pygame.MOUSEMOTION:
                     self.update_hover(e.pos)
-
                 elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
                     if self.choice_active:
                         self.handle_choice_click(e.pos)
                     else:
                         if not self._advance():
                             running = False
-
                 elif e.type == pygame.KEYDOWN and e.key in (pygame.K_RETURN, pygame.K_SPACE):
                     if self.choice_active:
                         pass
@@ -715,7 +867,6 @@ class VNEngine:
 
         pygame.quit()
 
-
 # -------------------------
 # main
 # -------------------------
@@ -724,19 +875,30 @@ def main():
     pygame.init()
     print(">>> pygame.init ok")
 
+    # mixer
+    try:
+        pygame.mixer.init()
+    except Exception as e:
+        print("[提示] pygame.mixer.init 失敗：", e)
+
     pygame.display.set_caption("多媒體期末｜主遊戲（VN + 3 MiniGames）")
     screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
     clock = pygame.time.Clock()
 
-    print(">>> loading yaml:", STORY_PATH)
-    raw = load_yaml(STORY_PATH)
+    # load script
+    script_path = resource_path(os.path.join("story", "script_draft.yaml"))
+    print(">>> loading yaml:", script_path)
+    raw = load_yaml(script_path)
     script = Script(raw)
     print(">>> script loaded, nodes =", len(script.nodes), "start =", script.start_id)
 
     assets = AssetManager()
     engine = VNEngine(screen, clock, assets, script)
-    engine.run()
 
+    # ✅ BGM：封面就播放，進遊戲不換，循環播放
+    try_start_bgm(engine.master_volume)
+
+    engine.run()
 
 if __name__ == "__main__":
     try:
